@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tata Surya — Solar System Sandbox</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" />
+<style>
+  :root {
+    --bg: #05060f;
+    --panel: rgba(14, 18, 34, 0.72);
+    --panel-border: rgba(120, 150, 220, 0.22);
+    --text: #e8ecf6;
+    --muted: #9aa6c4;
+    --accent: #6ea8fe;
+    --accent-2: #ffcf7a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: radial-gradient(circle at 50% 30%, #0a1024 0%, #05060f 60%, #02030a 100%);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #scene { position: fixed; inset: 0; display: block; }
+  .label {
+    color: #dfe6f5;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-shadow: 0 0 6px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,1);
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(10, 14, 28, 0.35);
+    border: 1px solid rgba(150, 175, 230, 0.18);
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+    transition: opacity 0.2s ease;
+  }
+  .label.sun { color: var(--accent-2); font-weight: 600; }
+
+  /* Control panel */
+  #ui {
+    position: fixed; top: 16px; left: 16px; z-index: 10;
+    width: 268px; max-width: calc(100vw - 32px);
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 16px;
+    backdrop-filter: blur(14px) saturate(1.2);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2);
+    box-shadow: 0 18px 50px rgba(0,0,0,0.45);
+    overflow: hidden;
+  }
+  #ui header {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--panel-border);
+  }
+  #ui header h1 {
+    margin: 0; font-size: 15px; font-weight: 700; letter-spacing: 0.02em;
+    display: flex; align-items: center; gap: 8px;
+  }
+  #ui header h1 .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #fff2c2, #ff9a1f 60%, #d2620a);
+    box-shadow: 0 0 10px #ffb347;
+  }
+  #ui header p { margin: 4px 0 0; font-size: 11px; color: var(--muted); }
+  .panel-body { padding: 12px 16px 16px; max-height: calc(100vh - 150px); overflow-y: auto; }
+  .row { margin: 12px 0; }
+  .row:first-child { margin-top: 4px; }
+  .row label.cap {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 11px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.06em; margin-bottom: 6px;
+  }
+  .row label.cap span { color: var(--accent); font-variant-numeric: tabular-nums; }
+  input[type=range] {
+    width: 100%; height: 4px; -webkit-appearance: none; appearance: none;
+    background: linear-gradient(90deg, var(--accent), #b89bff);
+    border-radius: 4px; outline: none; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 15px; height: 15px;
+    border-radius: 50%; background: #fff; border: 2px solid var(--accent);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4); cursor: pointer;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 15px; height: 15px; border-radius: 50%; background: #fff;
+    border: 2px solid var(--accent); cursor: pointer;
+  }
+  .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  button.ctrl {
+    appearance: none; border: 1px solid var(--panel-border);
+    background: rgba(40, 52, 88, 0.5); color: var(--text);
+    padding: 9px 8px; border-radius: 10px; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s ease; display: flex;
+    align-items: center; justify-content: center; gap: 6px;
+  }
+  button.ctrl:hover { background: rgba(70, 92, 150, 0.6); border-color: var(--accent); transform: translateY(-1px); }
+  button.ctrl:active { transform: translateY(0); }
+  button.ctrl.active { background: var(--accent); color: #06122e; border-color: var(--accent); }
+  .toggles { display: flex; flex-direction: column; gap: 8px; }
+  .toggle {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12.5px; cursor: pointer; user-select: none;
+  }
+  .switch { position: relative; width: 38px; height: 20px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider-sw {
+    position: absolute; inset: 0; background: rgba(90, 105, 150, 0.45);
+    border-radius: 999px; transition: 0.2s;
+  }
+  .slider-sw::before {
+    content: ""; position: absolute; height: 14px; width: 14px; left: 3px; top: 3px;
+    background: #fff; border-radius: 50%; transition: 0.2s;
+  }
+  .switch input:checked + .slider-sw { background: var(--accent); }
+  .switch input:checked + .slider-sw::before { transform: translateX(18px); }
+  select {
+    width: 100%; padding: 8px 10px; border-radius: 10px;
+    background: rgba(40, 52, 88, 0.5); color: var(--text);
+    border: 1px solid var(--panel-border); font-size: 12.5px; cursor: pointer;
+  }
+  .hint {
+    margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--panel-border);
+    font-size: 11px; color: var(--muted); line-height: 1.5;
+  }
+  .hint b { color: var(--text); font-weight: 600; }
+
+  /* Info card bottom-right */
+  #info {
+    position: fixed; right: 16px; bottom: 16px; z-index: 10;
+    width: 240px; max-width: calc(100vw - 32px);
+    background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 14px; backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px); padding: 14px 16px;
+    box-shadow: 0 18px 50px rgba(0,0,0,0.45);
+    transform: translateY(8px); opacity: 0; pointer-events: none;
+    transition: all 0.25s ease;
+  }
+  #info.show { transform: translateY(0); opacity: 1; }
+  #info h2 { margin: 0 0 8px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  #info h2 .swatch { width: 12px; height: 12px; border-radius: 50%; box-shadow: 0 0 8px rgba(255,255,255,0.2); }
+  #info .stat { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; }
+  #info .stat span:first-child { color: var(--muted); }
+  #info .stat span:last-child { font-variant-numeric: tabular-nums; }
+
+  /* zoom buttons */
+  #zoom { position: fixed; right: 16px; top: 16px; z-index: 10; display: flex; flex-direction: column; gap: 8px; }
+  #zoom button {
+    width: 42px; height: 42px; border-radius: 12px; font-size: 22px; font-weight: 600;
+    background: var(--panel); border: 1px solid var(--panel-border); color: var(--text);
+    cursor: pointer; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    transition: all 0.15s ease; line-height: 1;
+  }
+  #zoom button:hover { background: rgba(70, 92, 150, 0.6); border-color: var(--accent); }
+
+  #loader {
+    position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 16px;
+    background: radial-gradient(circle at 50% 40%, #0a1024, #02030a);
+    transition: opacity 0.6s ease;
+  }
+  #loader.hide { opacity: 0; pointer-events: none; }
+  .spinner {
+    width: 54px; height: 54px; border-radius: 50%;
+    border: 3px solid rgba(110,168,254,0.2); border-top-color: var(--accent);
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loader p { color: var(--muted); font-size: 13px; letter-spacing: 0.08em; }
+
+  @media (max-width: 600px) {
+    #ui { width: calc(100vw - 32px); }
+    #info { display: none; }
+  }
+</style>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <div id="loader"><div class="spinner"></div><p>MEMUAT TATA SURYA…</p></div>
+
+  <div id="zoom">
+    <button id="zoomIn" title="Zoom in">+</button>
+    <button id="zoomOut" title="Zoom out">−</button>
+  </div>
+
+  <div id="ui">
+    <header>
+      <h1><span class="dot"></span> Tata Surya Sandbox</h1>
+      <p>Solar System Explorer · Three.js</p>
+    </header>
+    <div class="panel-body">
+      <div class="row">
+        <div class="btn-grid">
+          <button class="ctrl active" id="playBtn">⏸ Pause</button>
+          <button class="ctrl" id="resetBtn">↺ Reset View</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <label class="cap">Kecepatan Orbit <span id="speedVal">1.0×</span></label>
+        <input type="range" id="speed" min="0" max="500" value="100" />
+      </div>
+
+      <div class="row">
+        <label class="cap">Fokus Planet</label>
+        <select id="focus">
+          <option value="-1">— Bebas (Sun) —</option>
+        </select>
+      </div>
+
+      <div class="row toggles">
+        <label class="toggle">Garis Orbit
+          <span class="switch"><input type="checkbox" id="tOrbits" checked><span class="slider-sw"></span></span>
+        </label>
+        <label class="toggle">Label Nama
+          <span class="switch"><input type="checkbox" id="tLabels" checked><span class="slider-sw"></span></span>
+        </label>
+        <label class="toggle">Bintang Latar
+          <span class="switch"><input type="checkbox" id="tStars" checked><span class="slider-sw"></span></span>
+        </label>
+        <label class="toggle">Cahaya Sinar (Bloom)
+          <span class="switch"><input type="checkbox" id="tBloom" checked><span class="slider-sw"></span></span>
+        </label>
+      </div>
+
+      <div class="hint">
+        <b>Drag</b> untuk memutar · <b>Scroll</b> untuk zoom · <b>Klik planet</b> untuk fokus &amp; info.
+      </div>
+    </div>
+  </div>
+
+  <div id="info">
+    <h2><span class="swatch" id="infoSwatch"></span><span id="infoName">—</span></h2>
+    <div class="stat"><span>Diameter</span><span id="infoDia">—</span></div>
+    <div class="stat"><span>Jarak dari Matahari</span><span id="infoDist">—</span></div>
+    <div class="stat"><span>Periode Orbit</span><span id="infoPeriod">—</span></div>
+    <div class="stat"><span>Lama Hari</span><span id="infoDay">—</span></div>
+    <div class="stat"><span>Jumlah Bulan</span><span id="infoMoons">—</span></div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
